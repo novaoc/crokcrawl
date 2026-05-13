@@ -35,15 +35,20 @@ def main():
 
     if args.install_playwright:
         try:
-            from playwright.sync_api import sync_playwright
+            import playwright  # noqa: F401
         except ImportError:
-            print("Playwright not installed. Run: uv run pip install playwright")
+            print(
+                "Playwright is not installed. Re-sync with the browser extra:\n"
+                "    uv sync --all-extras",
+                file=sys.stderr,
+            )
             sys.exit(1)
-        print("Installing Chromium browser...")
-        with sync_playwright() as p:
-            p.chromium.launch()
-        print("Done.")
-        sys.exit(0)
+        import subprocess
+        print("Installing Chromium browser via 'playwright install chromium' ...", flush=True)
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+        )
+        sys.exit(result.returncode)
 
     port = args.port
     if port is None:

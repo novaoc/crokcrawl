@@ -73,6 +73,8 @@ class Scraper:
             },
         )
         self._context = None
+        self._browser = None
+        self._playwright = None
         self._js_render_available = False
 
     async def start(self):
@@ -80,7 +82,7 @@ class Scraper:
         if self.config.js_render:
             try:
                 from playwright.async_api import async_playwright
-                pw = await async_playwright().start()
+                self._playwright = await async_playwright().start()
                 kwargs = {}
                 if self.config.stealth:
                     kwargs["args"] = [
@@ -88,8 +90,10 @@ class Scraper:
                         "--disable-dev-shm-usage",
                         "--no-sandbox",
                     ]
-                browser = await pw.chromium.launch(headless=self.config.headless, **kwargs)
-                self._context = await browser.new_context(
+                self._browser = await self._playwright.chromium.launch(
+                    headless=self.config.headless, **kwargs
+                )
+                self._context = await self._browser.new_context(
                     user_agent=self._client.headers.get("User-Agent"),
                     viewport={"width": 1920, "height": 1080},
                 )
@@ -104,11 +108,29 @@ class Scraper:
             except Exception as e:
                 logger.warning("Playwright unavailable, falling back to httpx only: %s", e)
                 self._js_render_available = False
+                # Clean up partial init so stop() doesn't try to close half-open handles.
+                await self._teardown_browser()
+
+    async def _teardown_browser(self):
+        """Best-effort teardown of Playwright resources."""
+        for attr, closer in (
+            ("_context", "close"),
+            ("_browser", "close"),
+            ("_playwright", "stop"),
+        ):
+            obj = getattr(self, attr, None)
+            if obj is None:
+                continue
+            try:
+                await getattr(obj, closer)()
+            except Exception as e:
+                logger.warning("Error closing %s: %s", attr, e)
+            setattr(self, attr, None)
+        self._js_render_available = False
 
     async def stop(self):
-        """Close HTTP client and browser."""
-        if self._context:
-            await self._context.browser().close()
+        """Close HTTP client and Playwright resources."""
+        await self._teardown_browser()
         await self._client.aclose()
 
     async def scrape(
