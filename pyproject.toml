@@ -1,0 +1,26 @@
+[project]
+name = "crokrawl"
+version = "0.1.0"
+description = "Open-source Firecrawl replacement — self-hosted web scraping API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "markdownify>=0.13",
+    "httpx>=0.28",
+    "pydantic>=2.0",
+    "beautifulsoup4[lxml]>=4.12",
+    "readability-lxml>=0.8",
+    "lxml-html-clean>=0.4",
+    "tldextract>=5.1",
+    "aiofiles>=24.1",
+    "dnspython>=2.7",
+    "ddgs>=0.7",
+]
+
+[project.scripts]
+crokrawl = "crokrawl.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
