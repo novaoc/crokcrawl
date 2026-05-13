@@ -58,7 +58,12 @@ class Scraper:
     def __init__(self, config):
         self.config = config
         self._client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0, connect=10.0),
+            timeout=httpx.Timeout(
+                connect=10.0,
+                read=float(config.timeout),
+                write=10.0,
+                pool=5.0,
+            ),
             follow_redirects=True,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -138,15 +143,33 @@ class Scraper:
             html = response.text
 
             # Re-fetch with Playwright if JS-rendered and browser available
-            if effective_js_render and self._is_js_rendered(html, response) and self._context:
-                browser_html, final = await self._fetch_with_browser(url, wait_ms=effective_wait)
-                if browser_html:
-                    html = browser_html
-                    result.source_url = final
+            is_spa = self._is_js_rendered(html, response)
+            if effective_js_render and is_spa:
+                if self._context:
+                    browser_html, final = await self._fetch_with_browser(url, wait_ms=effective_wait)
+                    if browser_html:
+                        html = browser_html
+                        result.source_url = final
+                    else:
+                        result.source_url = final_url
                 else:
+                    # SPA detected but Playwright not available — warn client
                     result.source_url = final_url
+                    result.metadata["js_render_skipped"] = True
+                    result.metadata["js_render_reason"] = "Playwright browser not available"
+                    result.metadata["extraction_method"] = "httpx-only-spa-detected"
+                    logger.warning(
+                        "SPA detected for %s but Playwright unavailable — returning limited shell content", url,
+                    )
             else:
                 result.source_url = final_url
+
+            # Set is_js_rendered flag for client awareness
+            if is_spa:
+                result.is_js_rendered = True
+                if not self._context and effective_js_render:
+                    result.metadata["js_render_skipped"] = True
+                    result.metadata["js_render_reason"] = "Playwright browser not available"
 
             result.html = html
             soup = BeautifulSoup(html, "lxml")

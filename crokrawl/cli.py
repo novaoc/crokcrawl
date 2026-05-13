@@ -50,9 +50,12 @@ def main():
         from crokrawl.config import config
         port = config.port
 
+    # Explicit import avoids uvicorn string-based re-importing, which breaks
+    # in background processes where .pth file based editable installs don't load.
+    from crokrawl.server import app
     import uvicorn
     uvicorn.run(
-        "crokcrawl.server:app",
+        app,
         host=args.host,
         port=port,
         reload=args.reload,

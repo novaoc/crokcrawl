@@ -158,7 +158,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="crokrawl",
     description="Open-source web scraping API",
-    version="0.1.0",
+    version=__import__("crokrawl").__version__,
     lifespan=lifespan,
 )
 
