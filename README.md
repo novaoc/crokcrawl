@@ -1,25 +1,43 @@
-# crokrawl — Open-Source Firecrawl Replacement
+# crokcrawl — Open-Source Firecrawl Replacement
 
-A self-hosted, minimal Firecrawl-compatible API. Drop it in, set `FIRECRAWL_API_URL=http://localhost:8000`, and it works.
+A self-hosted, Firecrawl-compatible API with optional Playwright JS rendering. Drop it in, set `FIRECRAWL_API_URL=http://localhost:8000`, and it works.
 
 ## Features
 
-- `/v1/scrape` — scrape a URL into clean Markdown (JS-rendered, anti-bot aware)
-- `/v1/search` — web search via SearXNG, with optional result scraping
+- `/v1/scrape` — scrape a URL into clean Markdown (static + JS-rendered via Playwright)
+- `/v1/search` — web search via SearXNG, with DuckDuckGo fallback and optional result scraping
 - `/v1/crawl` — async multi-page website crawler
 - `/v1/map` — discover URLs on a domain
 - Drop-in Firecrawl API compatibility (same request/response shapes)
+- SSRF protection (blocks private IPs, cloud metadata endpoints)
+- Built-in auth (Bearer token / x-api-key) and rate limiting
+- CLI with `crokcrawl` command
 
 ## Quick Start
 
+**Standard (static pages, ~80% coverage):**
 ```bash
-cd ~/.hermes/crokrawl
+cd ~/.hermes/crokcrawl
 uv sync
-uv run playwright install chromium
-uv run uvicorn crokrawl.server:app --host 0.0.0.0 --port 8000
+uv run uvicorn crokcrawl.server:app --host 0.0.0.0 --port 8000
 ```
 
-## Firecrawl Compatibility
+**With Playwright (full JS rendering):**
+```bash
+uv sync --all-extras
+uv run playwright install chromium
+uv run crokcrawl --port 8000
+```
+
+## CLI
+
+```bash
+uv run crokcrawl --help
+uv run crokcrawl --port 9000
+uv run crokcrawl --install-playwright   # Installs Chromium and exits
+```
+
+## Firecrawl Compatibility## Firecrawl Compatibility
 
 Same API, same response shapes:
 
