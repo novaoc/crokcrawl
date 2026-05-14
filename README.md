@@ -103,11 +103,18 @@ Or set `FIRECRAWL_API_URL=http://localhost:8000` — the existing Firecrawl clie
 ### v0.2.1 — 2026-05-13
 **Bug fixes and robustness improvements**
 
-- **Config deferred DNS validation:** `_validate_url()` now catches DNS resolution failures at startup and logs a warning instead of crashing the app. URL is validated at runtime before use. This prevents crashes in containerized setups where SearXNG isn't available yet.
-- **SPA detection visibility:** When Playwright is unavailable but an SPA is detected, the response now includes `metadata.js_render_skipped: true` and `metadata.js_render_reason`, so clients know JS rendering was skipped. The `ScrapeResult.is_js_rendered` flag is always set when SPA indicators are detected.
-- **CLI background process fix:** Changed from string-based `uvicorn.run("crokcrawl.server:app")` to explicit import `from crokcrawl.server import app`. This resolves `ModuleNotFoundError` issues in background/detached process contexts where Python `.pth` file editable install mechanisms may not activate.
-- **Httpx timeout uses config:** The scraper now reads `CROKRAWL_TIMEOUT` for the read timeout instead of hardcoding 30s.
-- **Version auto-sync:** API version now reads dynamically from `__init__.py` instead of being hardcoded, keeping it in sync with `pyproject.toml`.
+- **Auth 500 → 401 fix:** `_check_api_key()` now returns a `JSONResponse` instead of raising `HTTPException`. Starlette's `BaseHTTPMiddleware` doesn't catch FastAPI `HTTPException`, so wrong API keys surfaced as 500 with broken auth. This is a critical fix — auth was effectively broken when `CROKRAWL_API_KEY` was set.
+- **Playwright shutdown crash fix:** `Scraper.stop()` called `self._context.browser()` as a method, but it's a property (TypeError). Added `_teardown_browser()` with explicit `_browser`/`_playwright` tracking, proper teardown order (context → browser → playwright), and best-effort error handling so partial init doesn't leave dangling handles.
+- **`--install-playwright` actually installs:** Changed from `p.chromium.launch()` (which tries to run, not download) to `subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"])`. Downloads ~115MB browser binary correctly.
+- **`/v1/capabilities` reflects reality:** `js_render` now reads `scraper._js_render_available` instead of hardcoded `True`. Clients can tell if Playwright actually initialized.
+- **`/health` skips rate limiting:** Load balancer probes won't accidentally 429 themselves anymore. Other endpoints still rate-limited.
+- **`/openapi.json` and `/redoc` also skipped auth** (dev convenience, consider `CROKRAWL_PUBLIC_DOCS` env flag for production).
+- **Config deferred DNS validation:** `_validate_url()` now catches DNS resolution failures at startup and logs a warning instead of crashing. URL validated at runtime before use — prevents crashes when SearXNG isn't available yet.
+- **SPA detection visibility:** When Playwright is unavailable but SPA detected, response includes `metadata.js_render_skipped: true` and `metadata.js_render_reason`. `ScrapeResult.is_js_rendered` always set for SPA pages.
+- **CLI background process fix:** Changed from string-based `uvicorn.run("crokcrawl.server:app")` to explicit import. Fixes `ModuleNotFoundError` in background/detached processes where Python `.pth` editable install doesn't activate.
+- **Httpx timeout uses config:** Scraper reads `CROKRAWL_TIMEOUT` for read timeout instead of hardcoding 30s.
+- **Version auto-sync:** API version reads dynamically from `__init__.py`, staying in sync with `pyproject.toml`.
+- **Bumped to 0.2.1** in both `__init__.py` and `pyproject.toml`.
 
 ### v0.2.0 — 2026-05-13
 - Added CLI (`crokcrawl` command) with `--host`, `--port`, `--reload`, `--install-playwright`
