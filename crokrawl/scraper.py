@@ -41,6 +41,7 @@ class ScrapeResult:
     url: str = ""
     markdown: str = ""
     html: str = ""
+    raw_text: str = ""
     title: str = ""
     description: str = ""
     source_url: str = ""
@@ -155,9 +156,10 @@ class Scraper:
         # If force_js_render is True, skip httpx and go directly to browser
         if force_js_render and self._context and effective_js_render:
             try:
-                browser_html, final_url = await self._fetch_with_browser(url, wait_ms=effective_wait)
+                browser_html, raw_text, final_url = await self._fetch_with_browser(url, wait_ms=effective_wait)
                 if browser_html:
                     result.html = browser_html
+                    result.raw_text = raw_text
                     result.source_url = final_url
                     result.success = True
                     result.status_code = 200
@@ -185,9 +187,10 @@ class Scraper:
                 is_spa = self._is_js_rendered(html, response)
                 if effective_js_render and is_spa:
                     if self._context:
-                        browser_html, final = await self._fetch_with_browser(url, wait_ms=effective_wait)
+                        browser_html, raw_text, final = await self._fetch_with_browser(url, wait_ms=effective_wait)
                         if browser_html:
                             html = browser_html
+                            result.raw_text = raw_text
                             result.source_url = final
                         else:
                             result.source_url = final_url
@@ -275,22 +278,45 @@ class Scraper:
 
         return result
 
-    async def _fetch_with_browser(self, url: str, wait_ms: int = 500) -> tuple[str, str]:
-        """Fetch page using Playwright browser for full JS rendering."""
+    async def _fetch_with_browser(self, url: str, wait_ms: int = 500) -> tuple[str, str, str]:
+        """Fetch page using Playwright browser for full JS rendering.
+        
+        Uses 'domcontentloaded' first to avoid Cloudflare JS challenge stalls,
+        then waits explicitly for content. If Cloudflare block detected, retries
+        with longer wait.
+        
+        Returns: (html, raw_text, final_url)
+        """
         if not self._context:
-            return "", url
+            return "", "", url
         try:
             page = await self._context.new_page()
-            await page.goto(url, wait_until="networkidle", timeout=self.config.timeout * 1000)
+            # Use domcontentloaded instead of networkidle — Cloudflare challenges
+            # sometimes prevent networkidle from ever firing
+            await page.goto(url, wait_until="domcontentloaded", timeout=self.config.timeout * 1000)
+            
+            # Wait for JS challenge to resolve or dynamic content to load
             if wait_ms > 0:
                 await page.wait_for_timeout(wait_ms)
+            
+            # Check if we got a Cloudflare block page
             html_data = await page.content()
+            is_cf_block = "Cloudflare" in html_data or "blocked" in html_data[:2000].lower()
+            
+            if is_cf_block:
+                logger.info("Cloudflare challenge detected, waiting longer for resolution...")
+                await page.wait_for_timeout(10000)
+                html_data = await page.content()
+            
+            # Get raw visible text — what a human sees on the page
+            raw_text = await page.inner_text("body")
+            
             final_url = page.url
             await page.close()
-            return html_data, final_url
+            return html_data, raw_text, final_url
         except Exception as e:
             logger.error("Browser fetch error for %s: %s", url, e)
-            return "", url
+            return "", "", url
 
     async def map_urls(self, url: str, max_depth: int = 2) -> list[str]:
         """Discover URLs on a domain without scraping content."""
