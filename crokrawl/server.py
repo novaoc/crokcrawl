@@ -32,6 +32,7 @@ class ScrapeRequest(BaseModel):
     include_tags: list[str] | None = None
     exclude_tags: list[str] | None = None
     render_js: bool | None = None
+    force_js_render: bool = False  # Use Playwright even without SPA detection
     wait_for: int | None = None
     css_selector: str | None = None
     json_schema: dict | None = None
@@ -262,6 +263,7 @@ async def scrape(req: ScrapeRequest):
         include_tags=req.include_tags,
         exclude_tags=req.exclude_tags,
         render_js=req.render_js,
+        force_js_render=req.force_js_render,
         wait_for=req.wait_for,
     )
 

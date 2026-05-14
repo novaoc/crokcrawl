@@ -60,6 +60,7 @@ class Config:
     searxng_api_key: Optional[str] = os.environ.get("CROKRAWL_SEARXNG_API_KEY") or None
     max_concurrency: int = int(os.environ.get("CROKRAWL_MAX_CONCURRENCY", "4"))
     stealth: bool = os.environ.get("CROKRAWL_STEALTH", "true").lower() == "true"
+    stealth_level: str = os.environ.get("CROKRAWL_STEALTH_LEVEL", "basic")  # basic, enhanced
     timeout: int = int(os.environ.get("CROKRAWL_TIMEOUT", "30"))
     wait_for: int = int(os.environ.get("CROKRAWL_WAIT_FOR", "500"))
     headless: bool = os.environ.get("CROKRAWL_HEADLESS", "true").lower() == "true"
